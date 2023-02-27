@@ -1,0 +1,254 @@
+{
+  "name": "AudioCard",
+  "type": "RISC-V",
+  "dependenceList": [],
+  "srcDirs": [
+    "src"
+  ],
+  "virtualFolder": {
+    "name": "<virtual_root>",
+    "files": [],
+    "folders": [
+      {
+        "name": "ch32v307",
+        "files": [],
+        "folders": [
+          {
+            "name": "Core",
+            "files": [
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Core/core_riscv.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "Debug",
+            "files": [
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Debug/debug.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "Peripherial",
+            "files": [
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_adc.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_bkp.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_can.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_crc.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_dac.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_dbgmcu.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_dma.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_dvp.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_eth.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_exti.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_flash.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_fsmc.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_gpio.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_i2c.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_iwdg.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_misc.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_opa.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_pwr.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_rcc.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_rng.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_rtc.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_sdio.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_spi.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_tim.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_usart.c"
+              },
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Peripheral/src/ch32v30x_wwdg.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "Startup",
+            "files": [
+              {
+                "path": "../ch32v307/EVT/EXAM/SRC/Startup/startup_ch32v30x_D8C.S"
+              }
+            ],
+            "folders": []
+          }
+        ]
+      },
+      {
+        "name": "CherryUSB",
+        "files": [],
+        "folders": [
+          {
+            "name": "class",
+            "files": [],
+            "folders": [
+              {
+                "name": "audio",
+                "files": [
+                  {
+                    "path": "../CherryUSB/class/audio/usbd_audio.c"
+                  }
+                ],
+                "folders": []
+              },
+              {
+                "name": "cdc",
+                "files": [
+                  {
+                    "path": "../CherryUSB/class/cdc/usbd_cdc.c"
+                  }
+                ],
+                "folders": []
+              }
+            ]
+          },
+          {
+            "name": "core",
+            "files": [
+              {
+                "path": "../CherryUSB/core/usbd_core.c"
+              }
+            ],
+            "folders": []
+          },
+          {
+            "name": "port",
+            "files": [],
+            "folders": [
+              {
+                "name": "ch32",
+                "files": [
+                  {
+                    "path": "../CherryUSB/port/ch32/usb_dc_usbhs.c"
+                  }
+                ],
+                "folders": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "outDir": "build",
+  "deviceName": null,
+  "packDir": null,
+  "miscInfo": {
+    "uid": "00e8ea7a1675294784a1a5944fc4e47b"
+  },
+  "targets": {
+    "Debug": {
+      "excludeList": [
+        "<virtual_root>/CherryUSB/usbd_core.c",
+        "<virtual_root>/CherryUSB/port/ch32/usb_dc_usbfs.c",
+        "startup/startup_ch32v30x_D8C.S"
+      ],
+      "toolchain": "RISCV_GCC",
+      "compileConfig": {
+        "linkerScriptPath": "../ch32v307/EVT/EXAM/SRC/Ld/Link.ld",
+        "options": "null"
+      },
+      "uploader": "Custom",
+      "uploadConfig": {
+        "bin": "${ExecutableName}.bin",
+        "commandLine": "download.cmd ${programFile}",
+        "eraseChipCommand": ""
+      },
+      "uploadConfigMap": {
+        "JLink": {
+          "bin": "",
+          "baseAddr": "0x08000000",
+          "cpuInfo": {
+            "vendor": "ST",
+            "cpuName": "STM32F103C8"
+          },
+          "proType": 1,
+          "speed": 8000,
+          "otherCmds": ""
+        },
+        "OpenOCD": {
+          "bin": "",
+          "target": "${workspaceFolder}/tools/wch-riscv",
+          "interface": "${workspaceFolder}/tools/null",
+          "baseAddr": "0x08000000"
+        },
+        "Custom": {
+          "bin": "",
+          "commandLine": "test.sh ./build/Debug/ch32v307_demo.hex"
+        }
+      },
+      "custom_dep": {
+        "name": "default",
+        "incList": [
+          "../CherryUSB/core",
+          "../CherryUSB/class/audio",
+          "../CherryUSB/class/cdc",
+          "../CherryUSB/class/dfu",
+          "src",
+          "../CherryUSB/common",
+          "../ch32v307/EVT/EXAM/SRC/Core",
+          "../ch32v307/EVT/EXAM/SRC/Debug",
+          "../ch32v307/EVT/EXAM/SRC/Peripheral/inc"
+        ],
+        "libList": [],
+        "sourceDirList": [],
+        "defineList": [
+          "CONFIG_USB_HS"
+        ]
+      }
+    }
+  },
+  "version": "3.3"
+}
