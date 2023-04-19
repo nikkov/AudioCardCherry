@@ -240,12 +240,13 @@
           "../CherryUSB/common",
           "../ch32v307/EVT/EXAM/SRC/Core",
           "../ch32v307/EVT/EXAM/SRC/Debug",
-          "../ch32v307/EVT/EXAM/SRC/Peripheral/inc"
+          "../ch32v307/EVT/EXAM/SRC/Peripheral/inc",
+          "src/sys"
         ],
         "libList": [],
         "sourceDirList": [],
         "defineList": [
-          "CONFIG_USB_HS"
+          "CONFIG_USB_FS"
         ]
       }
     }

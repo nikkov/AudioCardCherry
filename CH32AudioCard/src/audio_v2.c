@@ -1,8 +1,10 @@
 #include "usbd_core.h"
 #include "usbd_audio.h"
 
-#define USBD_VID           0xffff
-#define USBD_PID           0xffff
+#ifdef CONFIG_USB_HS
+
+#define USBD_VID           0xFFFF
+#define USBD_PID           0xFFFE
 #define USBD_MAX_POWER     100
 #define USBD_LANGID_STRING 1033
 
@@ -226,3 +228,5 @@ void audio_test()
         }
     }
 }
+
+#endif // CONFIG_USB_HS
