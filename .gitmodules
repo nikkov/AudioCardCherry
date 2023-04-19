@@ -3,4 +3,4 @@
 	url = https://github.com/openwch/ch32v307
 [submodule "CherryUSB"]
 	path = CherryUSB
-	url = https://github.com/sakumisu/CherryUSB
+	url = https://github.com/nikkov/CherryUSB
