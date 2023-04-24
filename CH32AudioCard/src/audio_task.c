@@ -16,10 +16,10 @@ volatile uint8_t ep_busy_flag = 0;
 volatile uint8_t open_flag = 0;
 
 uint32_t cur_speaker_freq = AUDIO_SPEAKER_FREQ2;
-uint32_t cur_speaker_mic = AUDIO_MIC_FREQ1;
+uint32_t cur_microphone_freq = AUDIO_MIC_FREQ1;
 
 static inline uint32_t get_mic_packet_size() {
-    return cur_speaker_mic * AUDIO_MIC_FRAME_SIZE_BYTE * AUDIO_MIC_CHANNEL_NUM / 1000;
+    return cur_microphone_freq * AUDIO_MIC_FRAME_SIZE_BYTE * AUDIO_MIC_CHANNEL_NUM / 1000;
 }
 
 // call from interrupt
@@ -95,6 +95,7 @@ void usbd_audio_set_sampling_freq(uint8_t entity_id, uint8_t ep_ch, uint32_t sam
         USB_LOG_RAW("spk set freq:%d,%d,%lu\r\n", entity_id, ep_ch, sampling_freq);
     } 
     else {
+        cur_microphone_freq = sampling_freq;
         USB_LOG_RAW("mic set freq:%d,%d,%lu\r\n", entity_id, ep_ch, sampling_freq);
     }
 }
@@ -106,8 +107,8 @@ uint32_t usbd_audio_get_sampling_freq(uint8_t entity_id, uint8_t ep_ch)
         return cur_speaker_freq;
     } 
     else {
-        USB_LOG_RAW("mic get freq:%d,%d,%lu\r\n", entity_id, ep_ch, (uint32_t)AUDIO_MIC_FREQ1);
-        return AUDIO_MIC_FREQ1;
+        USB_LOG_RAW("mic get freq:%d,%d,%lu\r\n", entity_id, ep_ch, cur_microphone_freq);
+        return cur_microphone_freq;
     }
 }
 
@@ -146,13 +147,11 @@ void read_samples() {
     const uint8_t* data;
     uint32_t len;
     if((ep_busy_flag & EP_RX_FLAG) == 0) {
-        // now we have one full and and one filled buffer
+        // now we have one full and and one filling buffer
         data = read_bf.buffer + (read_bf.buffer_pos ? 0 : read_bf.halfsize);
         len = read_bf.count;
-        uint32_t wlen = ring_buf_write(&out_rb, data, len);
-        // if(wlen < len) {
-        //     USB_LOG_RAW("of\r\n");
-        // }
+        // write filled data to ring buffer
+        ring_buf_write(&out_rb, data, len);
         ep_busy_flag |= EP_RX_FLAG;
     }
 }
@@ -172,14 +171,18 @@ void write_samples() {
         // }
         //usbd_ep_start_write(AUDIO_IN_EP, write_bf.buffer + (write_bf.buffer_pos ? write_bf.halfsize : 0), write_bf.count);
         // prepare next buffer
-        write_bf.count = ring_buf_read(&out_rb, data, get_mic_packet_size());
+        uint32_t need_len = get_mic_packet_size();
+        write_bf.count = ring_buf_read(&out_rb, data, need_len);
+        if(write_bf.count < need_len) {
+            memset(data + write_bf.count, 0, need_len - write_bf.count);
+            write_bf.count = need_len;
+        }
         ep_busy_flag |= EP_TX_FLAG;
     }
 }
 
 void audio_test()
 {
-	//uint16_t i;
     ring_buf_init(&out_rb, out_rb_data, sizeof(out_rb_data));
     dbl_buffer_init(&write_bf, write_buffer, AUDIO_IN_PACKET_SZ);
     dbl_buffer_init(&read_bf, read_buffer, AUDIO_OUT_PACKET_SZ);
