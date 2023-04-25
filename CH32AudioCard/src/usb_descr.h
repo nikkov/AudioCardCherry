@@ -6,6 +6,7 @@
 
 #define AUDIO_IN_EP  0x81
 #define AUDIO_OUT_EP 0x02
+#define AUDIO_OUT_FB_EP 0x83
 
 /* AUDIO Class Config */
 #define AUDIO_SPEAKER_FREQ0           16000U

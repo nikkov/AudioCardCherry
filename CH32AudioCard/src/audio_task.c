@@ -9,17 +9,29 @@ dbl_buffer read_bf;
 USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t out_rb_data[2048];
 USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t write_buffer[AUDIO_IN_PACKET_SZ << 1];
 USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t read_buffer[AUDIO_OUT_PACKET_SZ << 1];
+USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t feedback_buffer[4];
 
 #define EP_TX_FLAG     1
 #define EP_RX_FLAG     2
+#define EP_FB_FLAG     4
 volatile uint8_t ep_busy_flag = 0;
 volatile uint8_t open_flag = 0;
 
 uint32_t cur_speaker_freq = AUDIO_SPEAKER_FREQ2;
 uint32_t cur_microphone_freq = AUDIO_MIC_FREQ1;
+volatile uint32_t cur_feedback_rate = 48 << 14;
+
 
 static inline uint32_t get_mic_packet_size() {
     return cur_microphone_freq * AUDIO_MIC_FRAME_SIZE_BYTE * AUDIO_MIC_CHANNEL_NUM / 1000;
+}
+
+static inline uint32_t get_spk_packet_size() {
+    return cur_speaker_freq * AUDIO_SPEAKER_FRAME_SIZE_BYTE * AUDIO_SPEAKER_CHANNEL_NUM / 1000;
+}
+
+static inline void set_feedback_value() {
+    cur_feedback_rate = (cur_speaker_freq / 1000) << 14;
 }
 
 // call from interrupt
@@ -28,7 +40,9 @@ void usbd_audio_open(uint8_t intf) {
     if (intf == 1) {
         // output speaker interface
         open_flag |= EP_RX_FLAG;
+        open_flag |= EP_FB_FLAG;
         ep_busy_flag |= EP_RX_FLAG;
+        ep_busy_flag |= EP_FB_FLAG;
         // setup first out ep read transfer
         dbl_buffer_reset(&read_bf);
         // start reading
@@ -78,6 +92,21 @@ void usbd_audio_in_callback(uint8_t ep, uint32_t nbytes)
     // USB_LOG_RAW("actual in len:%d\r\n", nbytes);
 }
 
+void usbd_audio_in_fb_callback(uint8_t ep, uint32_t nbytes)
+{
+    // write feedback ratio
+    feedback_buffer[0] = (uint8_t)cur_feedback_rate;
+    feedback_buffer[1] = (uint8_t)(cur_feedback_rate >> 8);
+    feedback_buffer[2] = (uint8_t)(cur_feedback_rate >> 16);
+#ifdef CONFIG_USB_HS
+    feedback_buffer[3] = (uint8_t)(cur_feedback_rate >> 24);
+    usbd_ep_start_write(AUDIO_OUT_FB_EP, feedback_buffer, 4);
+#else        
+    usbd_ep_start_write(AUDIO_OUT_FB_EP, feedback_buffer, 3);
+#endif        
+    ep_busy_flag &= ~EP_FB_FLAG;
+}
+
 void usbd_audio_set_volume(uint8_t entity_id, uint8_t ch, float dB)
 {
     USB_LOG_RAW("audio set volume:%d,%d,%d\r\n", entity_id, ch, (int)dB);
@@ -92,6 +121,7 @@ void usbd_audio_set_sampling_freq(uint8_t entity_id, uint8_t ep_ch, uint32_t sam
 {
     if(ep_ch == AUDIO_OUT_EP) {
         cur_speaker_freq = sampling_freq;
+        set_feedback_value();
         USB_LOG_RAW("spk set freq:%d,%d,%lu\r\n", entity_id, ep_ch, sampling_freq);
     } 
     else {
@@ -122,6 +152,11 @@ static struct usbd_endpoint audio_out_ep = {
     .ep_addr = AUDIO_OUT_EP
 };
 
+static struct usbd_endpoint audio_out_fb_ep = {
+    .ep_cb = usbd_audio_in_fb_callback,
+    .ep_addr = AUDIO_OUT_FB_EP
+};
+
 struct usbd_interface intf0;
 struct usbd_interface intf1;
 struct usbd_interface intf2;
@@ -135,6 +170,7 @@ void audio_init()
     usbd_add_interface(usbd_audio_init_intf(&intf2));
     usbd_add_endpoint(&audio_in_ep);
     usbd_add_endpoint(&audio_out_ep);
+    usbd_add_endpoint(&audio_out_fb_ep);
 
     usbd_audio_add_entity(0x02, AUDIO_CONTROL_FEATURE_UNIT);
     usbd_audio_add_entity(0x05, AUDIO_CONTROL_FEATURE_UNIT);
@@ -157,19 +193,20 @@ void read_samples() {
 }
 
 // call from main programm
+void write_feedback() {
+    if((ep_busy_flag & EP_FB_FLAG) == 0) {
+        // calc feedback
+        ep_busy_flag |= EP_FB_FLAG;
+    }
+}
+
+// call from main programm
 void write_samples() {
     uint8_t* data;
     if((ep_busy_flag & EP_TX_FLAG) == 0) {
         // now we sent one buffer and need to fill and write next one
         // write_bf.buffer_pos ^= 1;
         data = write_bf.buffer + (write_bf.buffer_pos ? 0 : write_bf.halfsize);
-        // if(write_bf.count == 0) {
-        //     // no data from out ep yet
-        //     write_bf.count = get_mic_packet_size();
-        //     memset(write_bf.buffer + (write_bf.buffer_pos ? write_bf.halfsize : 0), 0, write_bf.count);
-        //     USB_LOG_RAW("uf\r\n");
-        // }
-        //usbd_ep_start_write(AUDIO_IN_EP, write_bf.buffer + (write_bf.buffer_pos ? write_bf.halfsize : 0), write_bf.count);
         // prepare next buffer
         uint32_t need_len = get_mic_packet_size();
         write_bf.count = ring_buf_read(&out_rb, data, need_len);
@@ -193,6 +230,8 @@ void audio_test()
                 read_samples();
             if(open_flag & EP_TX_FLAG)
                 write_samples();
+            if(open_flag & EP_FB_FLAG)
+                write_feedback();
         }
     }
 }
