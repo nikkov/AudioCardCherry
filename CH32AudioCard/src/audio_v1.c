@@ -4,8 +4,6 @@
 
 #define USBD_VID           0xFFFF
 #define USBD_PID           0xFFFF
-#define USBD_MAX_POWER     100
-#define USBD_LANGID_STRING 1033
 
 #ifdef CONFIG_USB_HS
 #define EP_INTERVAL 0x04
@@ -32,7 +30,7 @@
                       AUDIO_SIZEOF_AC_FEATURE_UNIT_DESC(2, 1) + \
                       AUDIO_SIZEOF_AC_OUTPUT_TERMINAL_DESC)
 
-const uint8_t audio_descriptor[] = {
+uint8_t audio_descriptor[] = {
     USB_DEVICE_DESCRIPTOR_INIT(USB_2_0, 0xef, 0x02, 0x01, USBD_VID, USBD_PID, 0x0001, 0x01),
     USB_CONFIG_DESCRIPTOR_INIT(USB_AUDIO_CONFIG_DESC_SIZ, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     AUDIO_AC_DESCRIPTOR_INIT(0x00, 0x03, AUDIO_AC_SIZ, 0x00, 0x01, 0x02),
@@ -120,6 +118,66 @@ const uint8_t audio_descriptor[] = {
 #endif
     0x00
 };
+
+
+void usbd_audio_set_sampling_freq(uint8_t entity_id, uint8_t ep_ch, uint32_t sampling_freq)
+{
+    if(ep_ch == AUDIO_OUT_EP) {
+        cur_speaker_freq = sampling_freq;
+        set_feedback_value();
+        USB_LOG_RAW("spk set freq:%d,%d,%lu\r\n", entity_id, ep_ch, sampling_freq);
+    } 
+    else {
+        cur_microphone_freq = sampling_freq;
+        USB_LOG_RAW("mic set freq:%d,%d,%lu\r\n", entity_id, ep_ch, sampling_freq);
+    }
+}
+
+uint32_t usbd_audio_get_sampling_freq(uint8_t entity_id, uint8_t ep_ch)
+{
+    if(ep_ch == AUDIO_OUT_EP) {
+        USB_LOG_RAW("spk get freq:%d,%d,%lu\r\n", entity_id, ep_ch, cur_speaker_freq);
+        return cur_speaker_freq;
+    } 
+    else {
+        USB_LOG_RAW("mic get freq:%d,%d,%lu\r\n", entity_id, ep_ch, cur_microphone_freq);
+        return cur_microphone_freq;
+    }
+}
+
+static struct usbd_endpoint audio_in_ep = {
+    .ep_cb = usbd_audio_in_callback,
+    .ep_addr = AUDIO_IN_EP
+};
+
+static struct usbd_endpoint audio_out_ep = {
+    .ep_cb = usbd_audio_out_callback,
+    .ep_addr = AUDIO_OUT_EP
+};
+
+static struct usbd_endpoint audio_out_fb_ep = {
+    .ep_cb = usbd_audio_in_fb_callback,
+    .ep_addr = AUDIO_OUT_FB_EP
+};
+
+struct usbd_interface intf0;
+struct usbd_interface intf1;
+struct usbd_interface intf2;
+
+// call from main programm
+void audio_init()
+{
+    usbd_desc_register(audio_descriptor);
+    usbd_add_interface(usbd_audio_init_intf(&intf0));
+    usbd_add_interface(usbd_audio_init_intf(&intf1));
+    usbd_add_interface(usbd_audio_init_intf(&intf2));
+    usbd_add_endpoint(&audio_in_ep);
+    usbd_add_endpoint(&audio_out_ep);
+    usbd_add_endpoint(&audio_out_fb_ep);
+
+    usbd_audio_add_entity(0x02, AUDIO_CONTROL_FEATURE_UNIT);
+    usbd_audio_add_entity(0x05, AUDIO_CONTROL_FEATURE_UNIT);
+}
 
 
 #endif // CONFIG_USB_FS
