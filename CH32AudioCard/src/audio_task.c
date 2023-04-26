@@ -7,7 +7,7 @@ dbl_buffer write_bf;
 dbl_buffer read_bf;
 
 USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t out_rb_data[2048];
-USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t write_buffer[AUDIO_IN_PACKET_SZ << 1];
+USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t write_buffer[AUDIO_INP_PACKET_SZ << 1];
 USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t read_buffer[AUDIO_OUT_PACKET_SZ << 1];
 USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t feedback_buffer[4];
 
@@ -17,20 +17,24 @@ USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t feedback_buffer[4];
 volatile uint8_t ep_busy_flag = 0;
 volatile uint8_t open_flag = 0;
 
-uint32_t cur_speaker_freq = AUDIO_SPEAKER_FREQ2;
-uint32_t cur_microphone_freq = AUDIO_MIC_FREQ1;
+#if CONFIG_USBDEV_AUDIO_VERSION < 0x0200
+uint32_t cur_out_freq = AUDIO_OUT_FREQ1;
+uint32_t cur_inp_freq = AUDIO_INP_FREQ1;
+static inline uint32_t get_inp_packet_size() {
+    return ((uint32_t)((cur_inp_freq * AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM) / 1000));
+}
+#else
+uint32_t cur_out_freq = AUDIO_OUT_FREQ_MIN;
+uint32_t cur_inp_freq = AUDIO_INP_FREQ_MIN;
+static inline uint32_t get_inp_packet_size() {
+    return ((uint32_t)((cur_inp_freq * AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM) / 1000 / (8 / (1 << (EP_INTERVAL - 1)))));
+}
+#endif
+
 volatile uint32_t cur_feedback_rate = 48 << 14;
 
-static inline uint32_t get_mic_packet_size() {
-    return cur_microphone_freq * AUDIO_MIC_FRAME_SIZE_BYTE * AUDIO_MIC_CHANNEL_NUM / 1000;
-}
-
-static inline uint32_t get_spk_packet_size() {
-    return cur_speaker_freq * AUDIO_SPEAKER_FRAME_SIZE_BYTE * AUDIO_SPEAKER_CHANNEL_NUM / 1000;
-}
-
 void set_feedback_value() {
-    cur_feedback_rate = (cur_speaker_freq / 1000) << 14;
+    cur_feedback_rate = (cur_out_freq / 1000) << 14;
 }
 
 // call from interrupt
@@ -86,7 +90,7 @@ void usbd_audio_in_callback(uint8_t ep, uint32_t nbytes) {
     // successfully writen nbytes from (write_bf.buffer + (write_bf.buffer_pos ? 0 : write_bf.halfsize))
     write_bf.buffer_pos ^= 1;
     ep_busy_flag &= ~EP_TX_FLAG;
-    usbd_ep_start_write(AUDIO_IN_EP, write_bf.buffer + (write_bf.buffer_pos ? write_bf.halfsize : 0), write_bf.count);
+    usbd_ep_start_write(AUDIO_INP_EP, write_bf.buffer + (write_bf.buffer_pos ? write_bf.halfsize : 0), write_bf.count);
     // USB_LOG_RAW("actual in len:%d\r\n", nbytes);
 }
 
@@ -97,9 +101,9 @@ void usbd_audio_in_fb_callback(uint8_t ep, uint32_t nbytes) {
     feedback_buffer[2] = (uint8_t)(cur_feedback_rate >> 16);
 #ifdef CONFIG_USB_HS
     feedback_buffer[3] = (uint8_t)(cur_feedback_rate >> 24);
-    usbd_ep_start_write(AUDIO_OUT_FB_EP, feedback_buffer, 4);
+    usbd_ep_start_write(AUDIO_OFB_EP, feedback_buffer, 4);
 #else        
-    usbd_ep_start_write(AUDIO_OUT_FB_EP, feedback_buffer, 3);
+    usbd_ep_start_write(AUDIO_OFB_EP, feedback_buffer, 3);
 #endif        
     ep_busy_flag &= ~EP_FB_FLAG;
 }
@@ -144,7 +148,7 @@ void write_samples() {
         // write_bf.buffer_pos ^= 1;
         data = write_bf.buffer + (write_bf.buffer_pos ? 0 : write_bf.halfsize);
         // prepare next buffer
-        uint32_t need_len = get_mic_packet_size();
+        uint32_t need_len = get_inp_packet_size();
         write_bf.count = ring_buf_read(&out_rb, data, need_len);
         if(write_bf.count < need_len) {
             memset(data + write_bf.count, 0, need_len - write_bf.count);
@@ -157,7 +161,7 @@ void write_samples() {
 void audio_test()
 {
     ring_buf_init(&out_rb, out_rb_data, sizeof(out_rb_data));
-    dbl_buffer_init(&write_bf, write_buffer, AUDIO_IN_PACKET_SZ);
+    dbl_buffer_init(&write_bf, write_buffer, AUDIO_INP_PACKET_SZ);
     dbl_buffer_init(&read_bf, read_buffer, AUDIO_OUT_PACKET_SZ);
 
     while (1) {

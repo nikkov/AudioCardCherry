@@ -5,12 +5,6 @@
 #define USBD_VID           0xFFFF
 #define USBD_PID           0xFFFF
 
-#ifdef CONFIG_USB_HS
-#define EP_INTERVAL 0x04
-#else
-#define EP_INTERVAL 0x01
-#endif
-
 #define USB_AUDIO_CONFIG_DESC_SIZ (unsigned long)(9 +                                       \
                                                   AUDIO_AC_DESCRIPTOR_INIT_LEN(2) +         \
                                                   AUDIO_SIZEOF_AC_INPUT_TERMINAL_DESC +     \
@@ -19,8 +13,8 @@
                                                   AUDIO_SIZEOF_AC_INPUT_TERMINAL_DESC +     \
                                                   AUDIO_SIZEOF_AC_FEATURE_UNIT_DESC(2, 1) + \
                                                   AUDIO_SIZEOF_AC_OUTPUT_TERMINAL_DESC +    \
-                                                  AUDIO_AS_DESCRIPTOR_FB_INIT_LEN(4) +         \
-                                                  AUDIO_AS_DESCRIPTOR_INIT_LEN(3))
+                                                  AUDIO_AS_DESCRIPTOR_FB_INIT_LEN(2) +         \
+                                                  AUDIO_AS_DESCRIPTOR_INIT_LEN(2))
 
 #define AUDIO_AC_SIZ (AUDIO_SIZEOF_AC_HEADER_DESC(2) +          \
                       AUDIO_SIZEOF_AC_INPUT_TERMINAL_DESC +     \
@@ -40,10 +34,10 @@ uint8_t audio_descriptor[] = {
     AUDIO_AC_INPUT_TERMINAL_DESCRIPTOR_INIT(0x04, AUDIO_TERMINAL_STREAMING, 0x02, 0x0003),
     AUDIO_AC_FEATURE_UNIT_DESCRIPTOR_INIT(0x05, 0x04, 0x01, 0x03, 0x00, 0x00),
     AUDIO_AC_OUTPUT_TERMINAL_DESCRIPTOR_INIT(0x06, AUDIO_OUTTERM_SPEAKER, 0x05),
-    AUDIO_AS_DESCRIPTOR_FB_INIT(0x01, 0x04, 0x02, AUDIO_SPEAKER_FRAME_SIZE_BYTE, AUDIO_SPEAKER_RESOLUTION_BIT, AUDIO_OUT_EP, AUDIO_OUT_PACKET_SZ,\
-                             EP_INTERVAL, AUDIO_OUT_FB_EP, 3, AUDIO_SAMPLE_FREQ_3B(AUDIO_SPEAKER_FREQ0), AUDIO_SAMPLE_FREQ_3B(AUDIO_SPEAKER_FREQ1), AUDIO_SAMPLE_FREQ_3B(AUDIO_SPEAKER_FREQ2), AUDIO_SAMPLE_FREQ_3B(AUDIO_SPEAKER_FREQ3)),
-    AUDIO_AS_DESCRIPTOR_INIT(0x02, 0x03, 0x02, AUDIO_MIC_FRAME_SIZE_BYTE, AUDIO_MIC_RESOLUTION_BIT, AUDIO_IN_EP, AUDIO_IN_PACKET_SZ,\
-                             EP_INTERVAL, AUDIO_SAMPLE_FREQ_3B(AUDIO_MIC_FREQ0), AUDIO_SAMPLE_FREQ_3B(AUDIO_MIC_FREQ1), AUDIO_SAMPLE_FREQ_3B(AUDIO_MIC_FREQ2)),
+    AUDIO_AS_DESCRIPTOR_FB_INIT(0x01, 0x04, 0x02, AUDIO_OUT_FRAME_SIZE_BYTE, AUDIO_OUT_RESOLUTION_BIT, AUDIO_OUT_EP, AUDIO_OUT_PACKET_SZ,\
+                             EP_INTERVAL, AUDIO_OFB_EP, 3, AUDIO_SAMPLE_FREQ_3B(AUDIO_OUT_FREQ0), AUDIO_SAMPLE_FREQ_3B(AUDIO_OUT_FREQ1)),
+    AUDIO_AS_DESCRIPTOR_INIT(0x02, 0x03, 0x02, AUDIO_INP_FRAME_SIZE_BYTE, AUDIO_INP_RESOLUTION_BIT, AUDIO_INP_EP, AUDIO_INP_PACKET_SZ,\
+                             EP_INTERVAL, AUDIO_SAMPLE_FREQ_3B(AUDIO_INP_FREQ0), AUDIO_SAMPLE_FREQ_3B(AUDIO_INP_FREQ1)),
     ///////////////////////////////////////
     /// string0 descriptor
     ///////////////////////////////////////
@@ -123,31 +117,31 @@ uint8_t audio_descriptor[] = {
 void usbd_audio_set_sampling_freq(uint8_t entity_id, uint8_t ep_ch, uint32_t sampling_freq)
 {
     if(ep_ch == AUDIO_OUT_EP) {
-        cur_speaker_freq = sampling_freq;
+        cur_out_freq = sampling_freq;
         set_feedback_value();
-        USB_LOG_RAW("spk set freq:%d,%d,%lu\r\n", entity_id, ep_ch, sampling_freq);
+        USB_LOG_RAW("spk set freq:0x%X,0x%X,%lu\r\n", entity_id, ep_ch, sampling_freq);
     } 
     else {
-        cur_microphone_freq = sampling_freq;
-        USB_LOG_RAW("mic set freq:%d,%d,%lu\r\n", entity_id, ep_ch, sampling_freq);
+        cur_inp_freq = sampling_freq;
+        USB_LOG_RAW("mic set freq:0x%X,0x%X,%lu\r\n", entity_id, ep_ch, sampling_freq);
     }
 }
 
 uint32_t usbd_audio_get_sampling_freq(uint8_t entity_id, uint8_t ep_ch)
 {
     if(ep_ch == AUDIO_OUT_EP) {
-        USB_LOG_RAW("spk get freq:%d,%d,%lu\r\n", entity_id, ep_ch, cur_speaker_freq);
-        return cur_speaker_freq;
+        USB_LOG_RAW("spk get freq:%d,%d,%lu\r\n", entity_id, ep_ch, cur_out_freq);
+        return cur_out_freq;
     } 
     else {
-        USB_LOG_RAW("mic get freq:%d,%d,%lu\r\n", entity_id, ep_ch, cur_microphone_freq);
-        return cur_microphone_freq;
+        USB_LOG_RAW("mic get freq:%d,%d,%lu\r\n", entity_id, ep_ch, cur_out_freq);
+        return cur_out_freq;
     }
 }
 
 static struct usbd_endpoint audio_in_ep = {
     .ep_cb = usbd_audio_in_callback,
-    .ep_addr = AUDIO_IN_EP
+    .ep_addr = AUDIO_INP_EP
 };
 
 static struct usbd_endpoint audio_out_ep = {
@@ -157,7 +151,7 @@ static struct usbd_endpoint audio_out_ep = {
 
 static struct usbd_endpoint audio_out_fb_ep = {
     .ep_cb = usbd_audio_in_fb_callback,
-    .ep_addr = AUDIO_OUT_FB_EP
+    .ep_addr = AUDIO_OFB_EP
 };
 
 struct usbd_interface intf0;
