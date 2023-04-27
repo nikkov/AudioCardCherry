@@ -83,20 +83,23 @@
                       AUDIO_V2_SIZEOF_AC_FEATURE_UNIT_DESC(AUDIO_INP_CHANNEL_NUM) +  \
                       AUDIO_V2_SIZEOF_AC_OUTPUT_TERMINAL_DESC)
 
-uint8_t audio_descriptor[] = {
+const uint8_t audio_descriptor[] = {
     USB_DEVICE_DESCRIPTOR_INIT(USB_2_0, 0x00, 0x00, 0x00, USBD_VID, USBD_PID, 0x0001, 0x01),
     USB_CONFIG_DESCRIPTOR_INIT(USB_AUDIO_CONFIG_DESC_SIZ, 0x03, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     AUDIO_V2_AC_DESCRIPTOR_INIT(0x00, 0x03, AUDIO_AC_SIZ, AUDIO_CATEGORY_UNDEF, 0x00, 0x00),
-    AUDIO_V2_AC_CLOCK_SOURCE_DESCRIPTOR_INIT(0x01, 0x03, 0x03),
-    AUDIO_V2_AC_INPUT_TERMINAL_DESCRIPTOR_INIT(0x02, AUDIO_TERMINAL_STREAMING, 0x01, AUDIO_OUT_CHANNEL_NUM, OUTPUT_CH_ENABLE, 0x0000),
-    AUDIO_V2_AC_FEATURE_UNIT_DESCRIPTOR_INIT(0x03, 0x02, OUTPUT_CTRL),
-    AUDIO_V2_AC_OUTPUT_TERMINAL_DESCRIPTOR_INIT(0x04, AUDIO_OUTTERM_SPEAKER, 0x03, 0x01, 0x0000),
-    AUDIO_V2_AC_CLOCK_SOURCE_DESCRIPTOR_INIT(0x05, 0x03, 0x03),
-    AUDIO_V2_AC_INPUT_TERMINAL_DESCRIPTOR_INIT(0x06, AUDIO_INTERM_MIC, 0x05, AUDIO_INP_CHANNEL_NUM, INPUT_CH_ENABLE, 0x0000),
-    AUDIO_V2_AC_FEATURE_UNIT_DESCRIPTOR_INIT(0x07, 0x06, INPUT_CTRL),
-    AUDIO_V2_AC_OUTPUT_TERMINAL_DESCRIPTOR_INIT(0x08, AUDIO_TERMINAL_STREAMING, 0x07, 0x05, 0x0000),
-    AUDIO_V2_AS_DESCRIPTOR_INIT(0x01, 0x02, AUDIO_OUT_CHANNEL_NUM, OUTPUT_CH_ENABLE, AUDIO_OUT_FRAME_SIZE_BYTE, AUDIO_OUT_RESOLUTION_BIT, AUDIO_OUT_EP, AUDIO_OUT_PACKET_SZ, EP_INTERVAL),
-    AUDIO_V2_AS_DESCRIPTOR_INIT(0x02, 0x08, AUDIO_INP_CHANNEL_NUM, INPUT_CH_ENABLE, AUDIO_INP_FRAME_SIZE_BYTE, AUDIO_INP_RESOLUTION_BIT, AUDIO_INP_EP,  (AUDIO_INP_PACKET_SZ + AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM), EP_INTERVAL),
+
+    AUDIO_V2_AC_CLOCK_SOURCE_DESCRIPTOR_INIT(AC_CLOCK_OUT_SOURCE_ID, 0x03, 0x03),
+    AUDIO_V2_AC_INPUT_TERMINAL_DESCRIPTOR_INIT(AC_INP_TERMINAL_OUT_ID, AUDIO_TERMINAL_STREAMING, AC_CLOCK_OUT_SOURCE_ID, AUDIO_OUT_CHANNEL_NUM, OUTPUT_CH_ENABLE, 0x0000),
+    AUDIO_V2_AC_FEATURE_UNIT_DESCRIPTOR_INIT(AC_FEATURE_OUT_UNIT_ID, AC_INP_TERMINAL_OUT_ID, OUTPUT_CTRL),
+    AUDIO_V2_AC_OUTPUT_TERMINAL_DESCRIPTOR_INIT(AC_OUT_TERMINAL_OUT_ID, AUDIO_OUTTERM_SPEAKER, AC_FEATURE_OUT_UNIT_ID, AC_CLOCK_OUT_SOURCE_ID, 0x0000),
+    
+    AUDIO_V2_AC_CLOCK_SOURCE_DESCRIPTOR_INIT(AC_CLOCK_INP_SOURCE_ID, 0x03, 0x03),
+    AUDIO_V2_AC_INPUT_TERMINAL_DESCRIPTOR_INIT(AC_INP_TERMINAL_INP_ID, AUDIO_INTERM_MIC, AC_CLOCK_INP_SOURCE_ID, AUDIO_INP_CHANNEL_NUM, INPUT_CH_ENABLE, 0x0000),
+    AUDIO_V2_AC_FEATURE_UNIT_DESCRIPTOR_INIT(AC_FEATURE_INP_UNIT_ID, AC_INP_TERMINAL_INP_ID, INPUT_CTRL),
+    AUDIO_V2_AC_OUTPUT_TERMINAL_DESCRIPTOR_INIT(AC_OUT_TERMINAL_INP_ID, AUDIO_TERMINAL_STREAMING, AC_FEATURE_INP_UNIT_ID, AC_CLOCK_INP_SOURCE_ID, 0x0000),
+    
+    AUDIO_V2_AS_DESCRIPTOR_INIT(0x01, AC_INP_TERMINAL_OUT_ID, AUDIO_OUT_CHANNEL_NUM, OUTPUT_CH_ENABLE, AUDIO_OUT_FRAME_SIZE_BYTE, AUDIO_OUT_RESOLUTION_BIT, AUDIO_OUT_EP, AUDIO_OUT_PACKET_SZ, EP_INTERVAL),
+    AUDIO_V2_AS_DESCRIPTOR_INIT(0x02, AC_OUT_TERMINAL_INP_ID, AUDIO_INP_CHANNEL_NUM, INPUT_CH_ENABLE,  AUDIO_INP_FRAME_SIZE_BYTE, AUDIO_INP_RESOLUTION_BIT, AUDIO_INP_EP, (AUDIO_INP_PACKET_SZ + AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM), EP_INTERVAL),
     ///////////////////////////////////////
     /// string0 descriptor
     ///////////////////////////////////////
@@ -187,30 +190,33 @@ static const uint8_t mic_default_sampling_freq_table[] = {
 };
 
 void usbd_audio_get_sampling_freq_table(uint8_t entity_id, uint8_t **sampling_freq_table) {
-    if (entity_id == 0x01) {
-        printf("spk get freq table\r\n");
-        *sampling_freq_table = (uint8_t *)speaker_default_sampling_freq_table;
-    } else if (entity_id == 0x05) {
-        printf("mic get freq table\r\n");
-        *sampling_freq_table = (uint8_t *)mic_default_sampling_freq_table;
-    } else {
+    switch(entity_id) {
+        case AC_CLOCK_OUT_SOURCE_ID:
+            USB_LOG_RAW("spk get freq table\r\n");
+            *sampling_freq_table = (uint8_t *)speaker_default_sampling_freq_table;
+            break;
+        case AC_CLOCK_INP_SOURCE_ID:
+            USB_LOG_RAW("mic get freq table\r\n");
+            *sampling_freq_table = (uint8_t *)mic_default_sampling_freq_table;
+            break;
+        default:
+            printf("unknown get freq table\r\n");
     }
 }
 
 void usbd_audio_set_sampling_freq(uint8_t entity_id, uint8_t ep_ch, uint32_t sampling_freq) {
-    uint16_t packet_size = 0;
-    if (entity_id == 1) {
-        cur_out_freq = sampling_freq;
-        packet_size = ((sampling_freq * AUDIO_OUT_FRAME_SIZE_BYTE * AUDIO_OUT_CHANNEL_NUM) / 1000 / (8 / (1 << (EP_INTERVAL - 1))));
-        audio_descriptor[18 + USB_AUDIO_CONFIG_DESC_SIZ - AUDIO_V2_AS_DESCRIPTOR_INIT_LEN - 11] = packet_size;
-        audio_descriptor[18 + USB_AUDIO_CONFIG_DESC_SIZ - AUDIO_V2_AS_DESCRIPTOR_INIT_LEN - 10] = packet_size >> 8;
-        printf("spk set freq %d %ld %d\r\n", entity_id, sampling_freq, packet_size);
-    } else if (entity_id == 5) {
-        cur_inp_freq = sampling_freq;
-        packet_size = ((sampling_freq * AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM) / 1000 / (8 / (1 << (EP_INTERVAL - 1))));
-        audio_descriptor[18 + USB_AUDIO_CONFIG_DESC_SIZ - 11] = packet_size;
-        audio_descriptor[18 + USB_AUDIO_CONFIG_DESC_SIZ - 10] = packet_size >> 8;
-        printf("mic set freq %d %ld %d\r\n", entity_id, sampling_freq, packet_size);
+    switch(entity_id) {
+        case AC_CLOCK_OUT_SOURCE_ID:
+            cur_out_freq = sampling_freq;
+            set_feedback_value();
+            USB_LOG_RAW("spk set freq 0x%X %ld\r\n", entity_id, sampling_freq);
+            break;
+        case AC_CLOCK_INP_SOURCE_ID:
+            cur_inp_freq = sampling_freq;
+            printf("mic set freq 0x%X %ld\r\n", entity_id, sampling_freq);
+            break;
+        default:
+            USB_LOG_RAW("unknown set freq table\r\n");
     }
 }
 
@@ -238,10 +244,10 @@ void audio_init()
     usbd_add_endpoint(&audio_in_ep);
     usbd_add_endpoint(&audio_out_ep);
 
-    usbd_audio_add_entity(0x01, AUDIO_CONTROL_CLOCK_SOURCE);
-    usbd_audio_add_entity(0x03, AUDIO_CONTROL_FEATURE_UNIT);
-    usbd_audio_add_entity(0x05, AUDIO_CONTROL_CLOCK_SOURCE);
-    usbd_audio_add_entity(0x07, AUDIO_CONTROL_FEATURE_UNIT);
+    usbd_audio_add_entity(AC_CLOCK_OUT_SOURCE_ID, AUDIO_CONTROL_CLOCK_SOURCE);
+    usbd_audio_add_entity(AC_FEATURE_OUT_UNIT_ID, AUDIO_CONTROL_FEATURE_UNIT);
+    usbd_audio_add_entity(AC_CLOCK_INP_SOURCE_ID, AUDIO_CONTROL_CLOCK_SOURCE);
+    usbd_audio_add_entity(AC_FEATURE_INP_UNIT_ID, AUDIO_CONTROL_FEATURE_UNIT);
 }
 
 

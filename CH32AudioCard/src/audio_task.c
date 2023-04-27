@@ -13,15 +13,32 @@ USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t feedback_buffer[4];
 
 #define EP_TX_FLAG     1
 #define EP_RX_FLAG     2
+
+#ifdef AUDIO_OFB_EP
 #define EP_FB_FLAG     4
+#endif
+
 volatile uint8_t ep_busy_flag = 0;
 volatile uint8_t open_flag = 0;
 
-#if CONFIG_USBDEV_AUDIO_VERSION < 0x0200
+#ifdef CONFIG_USB_FS
 uint32_t cur_out_freq = AUDIO_OUT_FREQ1;
 uint32_t cur_inp_freq = AUDIO_INP_FREQ1;
 static inline uint32_t get_inp_packet_size() {
     return ((uint32_t)((cur_inp_freq * AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM) / 1000));
+}
+
+// FB rate is 3 bytes in 10.14 format
+/* For full-speed endpoints, the Ff value shall be encoded in an unsigned 10.10 (K=10) format
+    which fits into three bytes. Because the maximum integer value is fixed to 1,023, the 10.10 number will be
+    left-justified in the 24 bits, so that it has a 10.14 format. Only the first ten bits behind the binary point are
+    required. The lower four bits may be optionally used to extend the precision of Ff, otherwise, they shall be
+    reported as zero
+*/
+volatile uint32_t cur_feedback_rate = 48 << 14;
+void set_feedback_value() {
+    cur_feedback_rate = (cur_out_freq / 1000) << 14;
+    //cur_feedback_rate = (cur_out_freq / 1000 - 1) << 14; // test
 }
 #else
 uint32_t cur_out_freq = AUDIO_OUT_FREQ_MIN;
@@ -29,23 +46,30 @@ uint32_t cur_inp_freq = AUDIO_INP_FREQ_MIN;
 static inline uint32_t get_inp_packet_size() {
     return ((uint32_t)((cur_inp_freq * AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM) / 1000 / (8 / (1 << (EP_INTERVAL - 1)))));
 }
-#endif
 
+/* For high-speed endpoints, the Ff value shall be encoded in an unsigned 12.13 (K=13)
+    format which fits into four bytes. The value shall be aligned into these four bytes so that the binary point is
+    located between the second and the third byte so that it has a 16.16 format. The most significant four bits
+    shall be reported zero. Only the first 13 bits behind the binary point are required. The lower three bits may
+    be optionally used to extend the precision of Ff, otherwise, they shall be reported as zero.*/
+    // HS mode, FB rate is 4 bytes in 16.16 format per 125µs
 volatile uint32_t cur_feedback_rate = 48 << 14;
-
 void set_feedback_value() {
     cur_feedback_rate = (cur_out_freq / 1000) << 14;
 }
+#endif
 
 // call from interrupt
 void usbd_audio_open(uint8_t intf) {
-    printf("OPEN%d\r\n", intf);
+    USB_LOG_RAW("Open %d\r\n", intf);
     if (intf == 1) {
         // output speaker interface
         open_flag |= EP_RX_FLAG;
-        open_flag |= EP_FB_FLAG;
         ep_busy_flag |= EP_RX_FLAG;
+#ifdef AUDIO_OFB_EP
+        open_flag |= EP_FB_FLAG;
         ep_busy_flag |= EP_FB_FLAG;
+#endif        
         // setup first out ep read transfer
         dbl_buffer_reset(&read_bf);
         // start reading
@@ -60,10 +84,14 @@ void usbd_audio_open(uint8_t intf) {
 
 // call from interrupt
 void usbd_audio_close(uint8_t intf) {
-    printf("CLOSE%d\r\n", intf);
+    USB_LOG_RAW("Close %d\r\n", intf);
     if (intf == 1) {
         open_flag &= ~EP_RX_FLAG;
         ep_busy_flag &= ~EP_RX_FLAG;
+#ifdef AUDIO_OFB_EP
+        open_flag &= ~EP_FB_FLAG;
+        ep_busy_flag &= ~EP_FB_FLAG;
+#endif        
     } else {
         open_flag &= ~EP_TX_FLAG;
         ep_busy_flag &= ~EP_TX_FLAG;
@@ -72,6 +100,7 @@ void usbd_audio_close(uint8_t intf) {
 
 // call from interrupt
 void usbd_configure_done_callback(void) {
+    USB_LOG_RAW("Configure done");
 }
 
 // call from interrupt after received data from host
@@ -94,6 +123,7 @@ void usbd_audio_in_callback(uint8_t ep, uint32_t nbytes) {
     // USB_LOG_RAW("actual in len:%d\r\n", nbytes);
 }
 
+#ifdef AUDIO_OFB_EP
 void usbd_audio_in_fb_callback(uint8_t ep, uint32_t nbytes) {
     // write feedback ratio
     feedback_buffer[0] = (uint8_t)cur_feedback_rate;
@@ -107,15 +137,34 @@ void usbd_audio_in_fb_callback(uint8_t ep, uint32_t nbytes) {
 #endif        
     ep_busy_flag &= ~EP_FB_FLAG;
 }
+#endif
 
 void usbd_audio_set_volume(uint8_t entity_id, uint8_t ch, float dB)
 {
-    USB_LOG_RAW("audio set volume:%d,%d,%d\r\n", entity_id, ch, (int)dB);
+    switch(entity_id) {
+        case AC_FEATURE_OUT_UNIT_ID:
+            USB_LOG_RAW("Out set volume: %d,%d\r\n", ch, (int)dB);
+            break;
+        case AC_FEATURE_INP_UNIT_ID:
+            USB_LOG_RAW("In set volume: %d,%d\r\n", ch, (int)dB);
+            break;
+        default:
+            USB_LOG_RAW("Unknown set volume: %d,%d,%d\r\n", entity_id, ch, (int)dB);
+    }
 }
 
 void usbd_audio_set_mute(uint8_t entity_id, uint8_t ch, uint8_t enable)
 {
-    USB_LOG_RAW("audio set mute:%d,%d,%d\r\n", entity_id, ch, enable);
+    switch(entity_id) {
+        case AC_FEATURE_OUT_UNIT_ID:
+            USB_LOG_RAW("Out set mute: %d,%d\r\n", ch, enable);
+            break;
+        case AC_FEATURE_INP_UNIT_ID:
+            USB_LOG_RAW("In set mute: %d,%d\r\n", ch, enable);
+            break;
+        default:
+            USB_LOG_RAW("Unknown set mute: %d,%d,%d\r\n", entity_id, ch, enable);
+    }
 }
 
 // call from main programm
@@ -132,6 +181,7 @@ void read_samples() {
     }
 }
 
+#ifdef AUDIO_OFB_EP
 // call from main programm
 void write_feedback() {
     if((ep_busy_flag & EP_FB_FLAG) == 0) {
@@ -139,6 +189,7 @@ void write_feedback() {
         ep_busy_flag |= EP_FB_FLAG;
     }
 }
+#endif
 
 // call from main programm
 void write_samples() {
@@ -170,8 +221,10 @@ void audio_test()
                 read_samples();
             if(open_flag & EP_TX_FLAG)
                 write_samples();
+#ifdef AUDIO_OFB_EP
             if(open_flag & EP_FB_FLAG)
                 write_feedback();
+#endif                
         }
     }
 }

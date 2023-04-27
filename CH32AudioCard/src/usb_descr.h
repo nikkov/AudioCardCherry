@@ -11,8 +11,10 @@
 #define AUDIO_INP_EP    0x81
 // Output endpoint
 #define AUDIO_OUT_EP    0x02
+#ifdef CONFIG_USB_FS
 // Output feedback
 #define AUDIO_OFB_EP    0x83
+#endif
 
 /* AUDIO Class Config */
 #if CONFIG_USBDEV_AUDIO_VERSION < 0x0200
@@ -24,7 +26,7 @@
 #define AUDIO_OUT_FREQ_STEP       48000U
 #endif
 
-#define AUDIO_OUT_FRAME_SIZE_BYTE 4u
+#define AUDIO_OUT_FRAME_SIZE_BYTE 3u
 #define AUDIO_OUT_RESOLUTION_BIT  24u
 #define AUDIO_OUT_CHANNEL_NUM     2u
 
@@ -37,7 +39,7 @@
 #define AUDIO_INP_FREQ_STEP            48000U
 #endif
 
-#define AUDIO_INP_FRAME_SIZE_BYTE     4u
+#define AUDIO_INP_FRAME_SIZE_BYTE     3u
 #define AUDIO_INP_RESOLUTION_BIT      24u
 #define AUDIO_INP_CHANNEL_NUM         2u
 
@@ -46,6 +48,16 @@
 #else
 #define EP_INTERVAL 0x02
 #endif
+
+#define AC_CLOCK_OUT_SOURCE_ID  0x01
+#define AC_INP_TERMINAL_OUT_ID  0x02
+#define AC_FEATURE_OUT_UNIT_ID  0x03
+#define AC_OUT_TERMINAL_OUT_ID  0x04
+
+#define AC_CLOCK_INP_SOURCE_ID  0x05
+#define AC_INP_TERMINAL_INP_ID  0x06
+#define AC_FEATURE_INP_UNIT_ID  0x07
+#define AC_OUT_TERMINAL_INP_ID  0x08
 
 
 #if CONFIG_USBDEV_AUDIO_VERSION < 0x0200
@@ -56,7 +68,7 @@
 #define AUDIO_INP_PACKET_SZ ((uint32_t)((AUDIO_INP_FREQ_MAX * AUDIO_INP_FRAME_SIZE_BYTE * AUDIO_INP_CHANNEL_NUM) / 1000 / (8 / (1 << (EP_INTERVAL - 1)))))
 #endif
 
-extern uint8_t audio_descriptor[];
+extern const uint8_t audio_descriptor[];
 extern uint32_t cur_out_freq;
 extern uint32_t cur_inp_freq;
 
